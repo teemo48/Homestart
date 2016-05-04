@@ -1,4 +1,4 @@
-### Homestart documents
+### Elementary school analysis
 
 ```{r setup, echo=FALSE, include=FALSE}
 source('setup.r')

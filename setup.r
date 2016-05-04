@@ -14,10 +14,11 @@ default.stringsAsFactors()
 homestart.dir        = "/Users/timothywyant/Dropbox/Homestart"
 homestart.docs.dir   = paste( homestart.dir, 'Homestart-docs', sep='/')
 
-analysis.dir        = homestart.dir
-functions.dir       = paste( analysis.dir, 'Functions', sep='/')
-output.dir          = paste( analysis.dir, 'Rdata', sep='/')
-schools.dir         = paste( analysis.dir, "Homestart - Schools", sep='/')
+analysis.dir         = homestart.dir
+functions.dir        = paste( analysis.dir, 'Functions', sep='/')
+output.dir           = paste( analysis.dir, 'Rdata', sep='/')
+schools.dir          = paste( analysis.dir, "Homestart - Schools", sep='/')
+schools.by.grade.dir = paste( schools.dir, "Portland enrollments, by grade level")
 
 # ==========================================================
 # Directories -- Dropbox, accessible from web
@@ -42,8 +43,10 @@ data.manip.packs = c( 'data.table')
 survival.packs   = c( 'survival', 'mstate', 'msSurv', 'randomSurvivalForest')
 import.packs     = c( 'XLConnect', 'RJSONIO') # xlsx. RODBC
 impute.packs     = c( 'Amelia')
+
 mapping.packs    = c( 'sp', 'maptools', 'rgdal', 'rgeos', 'RgoogleMaps', 'raster', 'rasterVis', 'ggmap')
 # One of the mapping packs masks dplyr::select))
+
 scraping.packs   = c( 'XML', 'xml2')
 my.packs         = c( 'asbestos')
 paper.pack       = 'paper'
@@ -61,7 +64,7 @@ install( utility.packs)
 install( scraping.packs)
 install( paper.pack)
 
-# Install only if needed -- masks some commonly used functions
+# Install mapping packs only if needed -- masks some commonly used functions
 # install( mapping.packs)  # Has a select() function that masks the one from dplyr
 
 # =============================================================
