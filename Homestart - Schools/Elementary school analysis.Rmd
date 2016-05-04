@@ -1,0 +1,298 @@
+### Elementary school analysis
+
+```{r setup, echo=FALSE, include=FALSE}
+# This Rmd is stored in the schools subfolder under Homestart
+# Must go there if running interactively
+# setwd("/Users/timothywyant/Dropbox/Homestart/Homestart - Schools")
+
+source('../setup.r')
+```
+
+#### TW notes
+
+```{r shools, echo=FALSE}
+# Read in the enrollment data
+
+setwd(schools.dir) # Redundant if knitting
+dir()
+excel_sheets("Data request for Oct 1 enrollments 2016April25.xlsx")
+elem = read_excel("Data request for Oct 1 enrollments 2016April25.xlsx",
+                  skip=10, col_names= FALSE)
+elem %>% head(20)
+
+# Boil down to one obs per year and school
+i = which( elem$X0 == 'Total Elementary')
+i
+elem %<>% 
+  select(-X1) %>% 
+  slice( 1:(i-1))
+elem %>% data.frame
+names(elem) = as.character( c( 'School', 1999:2015))
+elem %>% data.frame
+el =
+ elem %>%  
+  melt( id.vars = 'School') %>% 
+  set_names(c('School', 'Year', 'n')) %>%
+  mutate( n = ifelse( n==0, NA, n)) %>% 
+  mutate( peaks = ifelse( School=='Peaks Island', 'Peaks Island', 'Other'))
+
+# Faceted line plots for each school that was operating in Oct 2015
+# Except for West/Bayside -- peculiar small one the stopped for awhile
+labels=c(2000, 2005, 2010, 2015)
+el %>% filter( !(School %in% c('Baxter', 'Jack'))) %>% 
+  filter( !str_detect( School, 'West/Bayside')) %>% 
+  ggplot( aes(Year,n,group=School,color=peaks)) + geom_line(size=.8) + 
+  expand_limits(y=0) +
+  scale_color_manual(values=c('black', 'red'), guide=FALSE) +
+  facet_wrap( ~School, ncol=3, scales='free_y') +
+  scale_x_discrete(breaks=labels, labels=as.character(labels)) +
+  ylab(NULL) + ggtitle('Portland elementary school enrollments on October 1\n1999-2015\n')
+
+# Now do a simplified analysis with three cats -- Cliff, Peaks, rest of Portland
+i = which( elem$X0 %in% c('Total Elementary', 'Peaks Island', 'Cliff Island'))
+i
+elem.all =
+elem %>% 
+  select(-X1) %>% 
+  slice(i)
+elem.all %>% data.frame
+names(elem.all) = as.character( c( 'School', 1999:2015))
+elem.all %>% data.frame
+el.all =
+ elem.all %>%  
+  melt( id.vars = 'School') %>% 
+  set_names(c('School', 'Year', 'n')) %>%
+  mutate( n = ifelse( n==0, NA, n)) %>% 
+  mutate( peaks = ifelse( School=='Peaks Island', 'Peaks Island', 'Other')) %>% 
+  group_by(Year) %>% 
+  mutate( n.oth = ifelse( School == "Total Elementary", n[3] - (n[1] + n[2]), n),
+          School= ifelse( School == "Total Elementary", "Other elementary schools", School),
+          Islands=ifelse( str_detect( School, 'Island'),1,2)) %>% 
+  ungroup() %>% 
+  group_by(School) %>% 
+  mutate( f = n / n[1],
+          pct = 100*f)
+
+label.df = 
+  el.all %>% 
+  filter( School != 'Cliff Island') %>%
+  summarise( Islands=min(Islands), 
+             xidx   = round(n()/2),
+             x      = Year[xidx],
+             y      = mean(pct)) %>% 
+  mutate( y = y + c( 3, -11),
+          label = ifelse( Islands == 1, School, 'Mainland schools')) %>% 
+  data.frame
+  
+    
+
+# Line plots for Peaks, Cliff, and Other
+labels=c(2000, 2005, 2010, 2015)
+el.all %>% 
+  filter( School != 'Cliff Island') %>% 
+  ggplot( aes(Year,pct,group=School, color=School)) + geom_line(size=.8) +
+  geom_text( data=label.df, mapping=aes(x,y,color=School,label=label)) +
+  expand_limits(y=0) +
+  scale_color_manual(values=c('black', 'red', 'blue'), guide=FALSE) +
+  # facet_wrap( ~Islands, ncol=2, scales='free_y') +
+  scale_x_discrete(breaks=labels, labels=as.character(labels)) +
+  ylab(NULL) + ggtitle('Portland elementary school enrollments on October 1\n1999-2015\nAs a percentage of October 1, 1999 enrollment\n')
+
+
+```
+
+```{r by-grade, echo=FALSE}
+setwd(schools.by.grade.dir)
+dir()
+files = dir()
+n.files = length(files)
+
+file.list   = vector( 'list', n.files)
+school.year = rep( 'character', n.files)
+n.cols      = vector( 'integer', n.files)
+for (i in 1:length(files)) {
+  
+  this.file      = read.csv(files[i])
+  testthat::expect_true( length(unique(this.file$School.Year)) == 1)
+  
+  school.year[i] = this.file$School.Year[1]
+  n.cols[i]      = ncol(this.file)
+  file.list[[i]] = this.file
+}
+file.list.df = data.frame( file=files, school.year, n.cols)
+file.list.df
+
+# Early years in the data do not have a 4 year old program
+colnames(file.list[[1]])
+colnames(file.list[[2]])
+
+# One year had an early kindergarten program in addition to a 4 year-old program
+colnames(file.list[[4]])
+colnames(file.list[[5]])
+colnames(file.list[[6]])
+
+by.grade.df = do.call( 'rbind.fill', file.list)
+
+by.grade.df %>% dcast( School.Name ~ .)
+
+peaks.by.grade =
+  by.grade.df %>% 
+  filter( School.Name == 'Peaks Island School') %>% 
+  select( School.Year,Total,Kindergarten,TotalK,G1,G2,G3,G4,G5) %>% 
+  mutate_each(funs(as.numeric),vars=-School.Year) %>% 
+  select( -Kindergarten) %>% 
+  rename( K = TotalK) %>% 
+  mutate( location='Peaks Island')
+peaks.by.grade
+
+mainland.schools.by.grade =
+  by.grade.df %>% 
+  filter( !(str_detect(School.Name, 'High') | str_detect(School.Name, 'Middle'))) %>% 
+  filter( !(str_detect(School.Name, 'Peaks Island') | str_detect(School.Name, 'Cliff Island'))) %>%  
+  select( School.Year,Total,Kindergarten,TotalK,G1,G2,G3,G4,G5) %>% 
+  mutate_each(funs(as.numeric),vars=-School.Year) %>% 
+  select( -Kindergarten) %>% 
+  rename( K = TotalK) %>% 
+  mutate( location='Mainland schools')
+mainland.schools.by.grade
+
+mainland.totals.by.grade = 
+  mainland.schools.by.grade %>% 
+  group_by( School.Year, location) %>% 
+  summarise_each( funs(sum), one_of('Total', 'K', 'G1', 'G2', 'G3', 'G4', 'G5' ))
+mainland.totals.by.grade  
+
+
+# ================================================================
+# Barplots of counts by grade, faceted by school year 
+# Not terribly informative
+# ================================================================
+
+peaks.by.grade %>% 
+  mutate( School.Year = paste( School.Year, '   Total =', Total)) %>% 
+  select(-Total, -location) %>% 
+  melt(id.vars='School.Year', variable.name='Grade', value.name='n') %>%
+  group_by( School.Year) %>% 
+  mutate(  n = as.numeric(n),
+           pct = 100* n / sum(n)) %>% 
+  ggplot( aes( Grade, n)) + geom_bar(stat='identity', fill='red') + facet_wrap( ~School.Year)
+mainland.totals.by.grade %>% 
+  ungroup() %>% 
+  mutate( School.Year = paste( School.Year, '   Total =', Total)) %>%
+  select(-Total, -location) %>% 
+  melt(id.vars='School.Year', variable.name='Grade', value.name='n') %>%
+  group_by( School.Year) %>% 
+  mutate( pct = 100* n / sum(n)) %>% 
+  ggplot( aes( Grade, n)) + geom_bar(stat='identity', fill='grey') + facet_wrap( ~School.Year)
+
+
+
+
+# ================================================================
+# Average number of students for each grade, PI and mainland
+# ================================================================
+
+pm = rbind( peaks.by.grade, mainland.totals.by.grade)
+
+pm.avg.cohorts =
+  pm %>% 
+  select(-Total) %>%
+  melt(id.vars=c('location', 'School.Year'), variable.name='Grade', value.name='n') %>%
+  group_by( location, Grade) %>%
+  summarise( avg = mean(n)) 
+pm.avg.cohorts
+
+
+pi.avg.cohorts =
+  peaks.by.grade %>% 
+  select(-Total) %>%
+  melt(id.vars='School.Year', variable.name='Grade', value.name='n') %>%
+  group_by( Grade) %>%
+  summarise( avg = mean(n)) %>% 
+  mutate(location='Peaks Island')
+mainland.avg.cohorts =
+  mainland.by.grade %>% 
+  select(-Total) %>%
+  melt(id.vars='School.Year', variable.name='Grade', value.name='n') %>%
+  group_by( Grade) %>%
+  summarise( avg = mean(n)) %>% 
+  mutate( location='Mainland schools')
+delta=.42 # Approx 1/2 bar width
+avg.cohorts = rbind( pi.avg.cohorts, mainland.avg.cohorts) %>% 
+ mutate( color='Average, 2006-2014',x=1:n(), xmin=x-delta, xmax=x+delta) # For horiz error bars 
+
+.by.grade %>% 
+  mutate( max.school.yr = max(School.Year)) %>% 
+  filter( School.Year == max(School.Year)) %>% 
+  select( -Total, -max.school.yr) %>% 
+  melt( id.vars='School.Year', value.name='n', variable.name='Grade') %>% 
+  ggplot( aes(Grade, n)) + geom_bar(stat='identity', fill='red') + 
+  geom_errorbarh( data=pi.avg.cohorts, mapping=aes(x=x, xmin=xmin, xmax=xmax, y=avg, color=color), size=1 ) +
+  scale_color_manual( values='black') + guides(color=guide_legend(title=NULL))
+  geom_point( data=pi.avg.cohorts, mapping=aes(Grade,avg))
+
+
+x = pi.avg.cohorts %>% ggplot(aes(Grade, avg)) + geom_point() + expand_limits(y=0) %>% 
+  ggtitle('Peaks )
+x
+y = mainland.avg.cohorts %>% ggplot(aes(Grade, avg)) + geom_point() + expand_limits(y=0)
+y
+ggplot_build(x)
+x %>% ggplot_build
+
+  
+  
+
+
+```
+
+
+```{r tables, echo=FALSE}
+since.2010 =
+el %>% filter( !(School %in% c('Baxter', 'Jack'))) %>% 
+  filter( !str_detect( School, 'West/Bayside')) %>% 
+  filter( !str_detect( School, 'Clifford')) %>% 
+  filter(Year %in% c(2010, 2015)) %>% 
+  mutate( `Compared to` = min(as.character(Year))) %>% 
+  group_by( School) %>% 
+  mutate( change = 100*round_any( n / lag(n), .01)-100) %>% 
+  ungroup() %>% 
+  filter(!is.na(change)) %>% 
+  arrange( desc(change))
+since.2005 =
+el %>% filter( !(School %in% c('Baxter', 'Jack'))) %>% 
+  filter( !str_detect( School, 'West/Bayside')) %>% 
+  filter( !str_detect( School, 'Clifford')) %>% 
+  filter( !str_detect( School, 'Adams')) %>% 
+  filter(Year %in% c(2005, 2015)) %>%
+    mutate( `Compared to` = min(as.character(Year))) %>% 
+  group_by( School) %>% 
+  mutate( change = 100*round_any( n / lag(n), .01)-100) %>% 
+  ungroup() %>% 
+  filter(!is.na(change)) %>% 
+  arrange( desc(change))
+since.2000 =
+el %>% filter( !(School %in% c('Baxter', 'Jack'))) %>% 
+  filter( !str_detect( School, 'West/Bayside')) %>% 
+  filter( !str_detect( School, 'Clifford')) %>% 
+  filter( !str_detect( School, 'Adams')) %>% 
+  filter(Year %in% c(2000, 2015)) %>%
+    mutate( `Compared to` = min(as.character(Year))) %>% 
+  group_by( School) %>% 
+  mutate( change = 100*round_any( n / lag(n), .01)-100) %>% 
+  ungroup() %>% 
+  filter(!is.na(change)) %>% 
+  arrange( desc(change))
+  
+changes = rbind( since.2000, since.2005, since.2010)
+changes
+
+library(ggrepel)
+changes %>% 
+  ggplot( aes(`Compared to`, change, color=peaks, label=School)) + 
+  geom_hline(yintercept=0, color='orange', size=2) +
+  geom_point() + 
+  geom_text_repel( nudge_x=.15) +
+  scale_color_manual(values=c('black', 'red'), guide=FALSE) +
+  ylab('Percent change') + ggtitle('Percent changes in Portland elementary school enrollments\n2015 compare to previous years\n')
+```
