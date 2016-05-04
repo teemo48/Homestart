@@ -202,43 +202,30 @@ pm.avg.cohorts =
   summarise( avg = mean(n)) 
 pm.avg.cohorts
 
-
-pi.avg.cohorts =
-  peaks.by.grade %>% 
-  select(-Total) %>%
-  melt(id.vars='School.Year', variable.name='Grade', value.name='n') %>%
-  group_by( Grade) %>%
-  summarise( avg = mean(n)) %>% 
-  mutate(location='Peaks Island')
-mainland.avg.cohorts =
-  mainland.by.grade %>% 
-  select(-Total) %>%
-  melt(id.vars='School.Year', variable.name='Grade', value.name='n') %>%
-  group_by( Grade) %>%
-  summarise( avg = mean(n)) %>% 
-  mutate( location='Mainland schools')
+# Prepare for plotting a layer with averages by grade portrayed as horiz error bars
 delta=.42 # Approx 1/2 bar width
-avg.cohorts = rbind( pi.avg.cohorts, mainland.avg.cohorts) %>% 
- mutate( color='Average, 2006-2014',x=1:n(), xmin=x-delta, xmax=x+delta) # For horiz error bars 
+pm.avg.cohorts %<>% 
+ group_by(location) %>% 
+ mutate( color='Average number of students, 2006-2014',x=1:n(), 
+         xmin=x-delta, xmax=x+delta, loc.for.plot.color=location )  
+pm.avg.cohorts
 
-.by.grade %>% 
+pm %>% 
+  mutate( loc.for.plot.color=location) %>% 
   mutate( max.school.yr = max(School.Year)) %>% 
   filter( School.Year == max(School.Year)) %>% 
   select( -Total, -max.school.yr) %>% 
-  melt( id.vars='School.Year', value.name='n', variable.name='Grade') %>% 
-  ggplot( aes(Grade, n)) + geom_bar(stat='identity', fill='red') + 
-  geom_errorbarh( data=pi.avg.cohorts, mapping=aes(x=x, xmin=xmin, xmax=xmax, y=avg, color=color), size=1 ) +
-  scale_color_manual( values='black') + guides(color=guide_legend(title=NULL))
-  geom_point( data=pi.avg.cohorts, mapping=aes(Grade,avg))
-
-
-x = pi.avg.cohorts %>% ggplot(aes(Grade, avg)) + geom_point() + expand_limits(y=0) %>% 
-  ggtitle('Peaks )
-x
-y = mainland.avg.cohorts %>% ggplot(aes(Grade, avg)) + geom_point() + expand_limits(y=0)
-y
-ggplot_build(x)
-x %>% ggplot_build
+  melt( id.vars=c('location', 'loc.for.plot.color','School.Year'), 
+        value.name='n', variable.name='Grade') %>% 
+  ggplot( aes(Grade, n, fill=loc.for.plot.color)) + geom_bar(stat='identity' ) + 
+  facet_wrap( ~location, scale='free_y') +
+  geom_errorbarh( data=pm.avg.cohorts, 
+                  mapping=aes(x=x, xmin=xmin, xmax=xmax, y=avg, color=color), size=1 ) +
+  scale_color_manual( values='black') + guides(color=guide_legend(title=NULL)) +
+  scale_fill_manual( values=c('grey', 'red'), guide=FALSE) +
+  xlab(NULL) + ylab(NULL) + 
+  ggtitle( 'Number of elementary school students by grade\nSchool year 2014-2015\n') +
+  theme(legend.position="bottom")
 
   
   
